@@ -1,0 +1,125 @@
+:root {
+    --E: 100px;
+    --D: 70px;
+    --Planet: 25px;
+    --Craft: 10px;
+    background-color: black;
+}
+
+#navbox {
+    width: 512px;
+    height: 512px;
+    border: solid black 5px;
+    -webkit-perspective: 180px;
+    perspective-origin: center;
+}
+
+@keyframes revolve {
+    from {transform: rotateY(-360deg) rotateX(10deg)}
+    to {transform: rotateY(360deg) rotateX(10deg)}
+}
+
+#origin {
+    animation-name: revolve;
+    animation-duration: 30s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+
+    transform-style: preserve-3d;
+
+    transform-origin: center;
+    position: absolute;
+    top: 50%;
+    right: 50%;
+}
+
+.dot {
+    transform-origin: center;
+    transform-style: preserve-3d;
+    position: absolute;
+    top: 50%;
+    right: 50%;
+}
+
+
+
+.panel {
+    transform-origin: center;
+    transform-style: preserve-3d;
+    position: absolute;
+    top: 50%;
+    right: 50%;
+}
+
+.planet > .panel {
+    border-radius: 50%;
+    width:  calc(var(--Planet)*2);
+    height: calc(var(--Planet)*2);
+}
+
+.planet > .panelXY {
+    transform: translate3d(var(--Planet), calc(-1*var(--Planet)), 0);
+}
+
+.planet > .panelYZ {
+    transform: translate3d(var(--Planet), calc(-1*var(--Planet)), 0) rotateX(90deg);
+}
+
+.planet > .panelXZ {
+    transform: translate3d(var(--Planet), calc(-1*var(--Planet)), 0) rotateY(90deg);
+}
+
+
+.craft > .panel {
+    width:  0;
+    height: 0;
+}
+
+.craft > .panelXY {
+    transform: translate3d(var(--Craft), calc(-1*var(--Craft)), 0);
+    border-top: none;
+    border-bottom: calc(var(--Craft)*2) solid;
+    border-left: var(--Craft) solid transparent;
+    border-right: var(--Craft) solid transparent;
+}
+
+.craft > .panelYZ {
+    transform: translate3d(var(--Craft), calc(0.125*var(--Craft)), 0) rotateX(90deg);
+    width: calc(var(--Craft) * 2);
+    height: calc(var(--Craft) * 2);
+    border-radius: 50%;
+    background-color: transparent;
+    border: rgba(255, 165, 225, 0.3) dashed 3px;
+    box-sizing: border-box;
+}
+
+.craft > .panelXZ {
+    transform: translate3d(var(--Craft), calc(-1*var(--Craft)), 0) rotateY(90deg);
+    border-top: none;
+    border-bottom: calc(var(--Craft)*2) solid;
+    border-left: var(--Craft) solid transparent;
+    border-right: var(--Craft) solid transparent;
+}
+
+
+.defender > .panelXY {
+    border-bottom-color: steelblue;
+}
+
+.defender > .panelXZ {
+    border-bottom-color: steelblue;
+}
+
+.attacker > .panelXY {
+    border-bottom-color: red;
+}
+
+.attacker > .panelXZ {
+    border-bottom-color: red;
+}
+
+.planet[data-name="Earth"] > .panel {
+    background-color: rgba(0, 255, 0, 0.1);
+    border: rgba(0, 69, 0, 1) 2px solid;
+    box-sizing: border-box;
+}
