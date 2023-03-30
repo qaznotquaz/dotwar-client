@@ -15,8 +15,15 @@
 }
 
 @keyframes revolve {
-    from {transform: rotateY(-360deg) rotateX(10deg)}
-    to {transform: rotateY(360deg) rotateX(10deg)}
+    from {transform: rotateX(-13deg) rotateY(-360deg) }
+    to {transform:   rotateX(-13deg) rotateY(360deg)  }
+}
+
+@keyframes axisTest {
+    0% {transform:  rotateY(0deg)  rotateX(0deg)   rotateZ(0deg)}
+    30% {transform: rotateY(90deg) rotateX(0deg)   rotateZ(0deg)}
+    60% {transform: rotateY(90deg) rotateX(360deg) rotateZ(0deg)}
+    90% {transform: rotateY(90deg) rotateX(360deg) rotateZ(360deg)}
 }
 
 #origin {
@@ -24,13 +31,6 @@
     animation-duration: 30s;
     animation-iteration-count: infinite;
     animation-timing-function: linear;
-
-    transform-style: preserve-3d;
-
-    transform-origin: center;
-    position: absolute;
-    top: 50%;
-    right: 50%;
 }
 
 .dot {
@@ -40,8 +40,6 @@
     top: 50%;
     right: 50%;
 }
-
-
 
 .panel {
     transform-origin: center;
@@ -89,7 +87,7 @@
     height: calc(var(--Craft) * 2);
     border-radius: 50%;
     background-color: transparent;
-    border: rgba(255, 165, 225, 0.3) dashed 3px;
+    border: dashed 3px;
     box-sizing: border-box;
 }
 
@@ -122,4 +120,17 @@
     background-color: rgba(0, 255, 0, 0.1);
     border: rgba(0, 69, 0, 1) 2px solid;
     box-sizing: border-box;
+}
+
+.line {
+    border: none;
+
+    transform-origin: top center;
+    transform-style: preserve-3d;
+    /*animation-name: axisTest;
+    animation-duration: 10s;
+    animation-iteration-count: infinite;*/
+    position: absolute;
+
+    width: 0px;
 }

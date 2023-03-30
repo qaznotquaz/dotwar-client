@@ -3,6 +3,7 @@ const D = 1.12e7
 let EDGE = 10000000000
 let factor
 let lastScan
+let lastSummary
 
 window.onload = function registerEventHandlersAndLoad() {
     let submit_btn = document.getElementById("submit_btn");
@@ -20,6 +21,7 @@ window.onload = function registerEventHandlersAndLoad() {
         EDGE = (EDGE + delta > 0) ? EDGE + delta : EDGE;
 
         redrawLastScan();
+        redrawLastSummary();
         console.log(EDGE);
         e.preventDefault();
     }, {passive: false})
@@ -38,6 +40,15 @@ function drawScan(scan) {
     document.querySelector(':root').style.setProperty('--E', `${E * factor}px`)
     document.querySelector(':root').style.setProperty('--D', `${D * factor}px`)
 
+    draw_line([0, 0, 0], [EDGE, 0, 0], 'red 2px solid')
+    draw_line([0, 0, 0], [0, EDGE, 0], 'green 2px solid')
+    draw_line([0, 0, 0], [0, 0, EDGE], 'blue 2px solid')
+
+    draw_line([0, 0, 0], [-EDGE, 0, 0], 'red 1px dashed')
+    draw_line([0, 0, 0], [0, -EDGE, 0], 'green 1px dashed')
+    draw_line([0, 0, 0], [0, 0, -EDGE], 'blue 1px dashed')
+
+
     JSON.parse(scan)['entities'].forEach(draw_vessel)
 
     lastScan = scan
@@ -49,10 +60,52 @@ function redrawLastScan() {
     }
 }
 
+function drawSummary(summary) {
+    console.log(summary)
+
+    let paths = {}
+
+    JSON.parse(summary)['events'].forEach(function (item) {
+        if(item['type'] === 'burn') {
+            let vessel = item['args']['vessel']
+            let pos = item['args']['position']
+
+            console.log(vessel + ' at ' + pos)
+
+            if(!paths[vessel]) {
+                paths[vessel] = []
+            }
+
+            paths[vessel].push(pos)
+        }
+    })
+
+    for(let [key, value] of Object.entries(paths)) {
+        drawPath(value)
+    }
+
+    lastSummary = summary
+}
+
+function redrawLastSummary() {
+    if (lastSummary) {
+        drawSummary(lastSummary)
+    }
+}
+
+function drawPath(nodes, style = 'white 1px solid') {
+    nodes.forEach(function (item, index) {
+        if(index < nodes.length - 1) {
+            draw_line(item, nodes[index + 1], style)
+        }
+    })
+}
+
 function draw_vessel(vessel) {
     const origin = document.getElementById('origin');
     let craftDot = document.createElement('div')
     origin.appendChild(craftDot);
+    let style;
 
     craftDot.classList.add('dot')
     craftDot.classList.add(vessel['type'])
@@ -61,9 +114,11 @@ function draw_vessel(vessel) {
     switch (vessel['team']) {
         case 0:
             team = 'defender'
+            style = 'lightblue 2px double'
             break
         case 1:
             team = 'attacker'
+            style = 'maroon 2px double'
             break
         case -1:
         default:
@@ -91,16 +146,160 @@ function draw_vessel(vessel) {
     craftDot.appendChild(panelYZ);
     craftDot.appendChild(panelXZ);
 
-    const coords = transform_coordinates(vessel['r'])
+    const coords = transformVectorToDrawingSpace(vessel['r'])
+    const spherical = cartesianToSpherical(vessel['a'])
+
+    panelYZ.style.borderColor = `rgba(255, 127, 0, ${spherical[0]/E})`
+
     craftDot.style.transform = `translate3d(${coords[0]}px, ${coords[1]}px, ${coords[2]}px)`
+    rotateToSpherical(craftDot, spherical)
+
+    if(vessel['type'] === 'craft') {
+        drawProjection(vessel, 18, 2, style)
+    }
 }
 
-function transform_coordinates(coords) {
+function draw_line(vectorA, vectorB, style = 'white 1px solid') {
+    const origin = document.getElementById('origin');
+    let line = document.createElement('div')
+    let gimbal = document.createElement('div')
+    line.classList.add('line')
+    gimbal.classList.add('dot')
+
+    gimbal.appendChild(line)
+    origin.appendChild(gimbal);
+
+    const scaledA = transformVectorToDrawingSpace(vectorA)
+    const scaledB = transformVectorToDrawingSpace(vectorB)
+
+    if(Math.sqrt((vectorA[0]*vectorA[0]) + (vectorA[1]*vectorA[1]) + (vectorA[2]*vectorA[2])) < E) {
+        console.log('POINT IN EARTH: ' + vectorA)
+    }
+
+    console.log('line from ' + vectorA + ' to ' + vectorB)
+
+    const difference = subVectors(scaledB, scaledA)
+    const spherical = cartesianToSpherical(difference)
+
+    const length = spherical[0]
+
+    line.style.height = `${length}px`
+    line.style.borderLeft = style
+    line.style.borderRight = style
+
+    gimbal.style.transform += `translate3d(${scaledA[0]}px, ${scaledA[1]}px, ${scaledA[2]}px)`
+
+    rotateToSpherical(line, spherical)
+}
+
+function drawProjection(vessel, steps, stepSize, style = 'white 1px solid') {
+    let time = 0.0
+    let path = []
+
+    for(let i = 0; i < steps; i++) {
+        path.push(pointAlongCurveAtTime(
+            vessel['r'],
+            vessel['v'],
+            vessel['a'],
+            time
+        ))
+
+        time += stepSize
+    }
+
+    drawPath(path, style)
+}
+
+function pointAlongCurveAtTime(r, v, a, t) {
     return [
-        coords[0] * factor,
-        coords[1] * factor,
-        coords[2] * factor
+        r[0] + (v[0]*t) + (a[0]*t*t*0.5),
+        r[1] + (v[1]*t) + (a[1]*t*t*0.5),
+        r[2] + (v[2]*t) + (a[2]*t*t*0.5)
     ]
+}
+
+function scaleVector(vector, scalar) {
+    return [
+        vector[0] * scalar,
+        vector[1] * scalar,
+        vector[2] * scalar
+    ]
+}
+
+function transformVectorToDrawingSpace(vector) {
+    let transformed = scaleVector(vector, factor)
+    return [
+        -transformed[0],
+        -transformed[1],
+        transformed[2]
+    ]
+}
+
+function addVectors(a, b) {
+    return [
+        a[0] + b[0],
+        a[1] + b[1],
+        a[2] + b[2]
+    ]
+}
+
+function subVectors(a, b) {
+    return [
+        a[0] - b[0],
+        a[1] - b[1],
+        a[2] - b[2]
+    ]
+}
+
+function cartesianToSpherical(vector) {
+    // i know i'm scrambling the coordinates here.
+    // this is because CSS coordinates are oriented differently to the cartesian space this formula expects.
+    // it expects XY to be the horizontal plane, and Z to be vertical.
+    // this is fine, except that CSS considers ZX to be horizontal and Y to be vertical.
+    const y = vector[0] // "X"
+    const z = vector[1] // "Y"
+    const x = vector[2] // "Z"
+
+    const magnitude = Math.sqrt((x*x) + (y*y) + (z*z))
+
+    let theta = 0
+
+    if(z !== 0) {
+        const numerator = Math.sqrt((x*x) + (y*y))
+        theta = Math.atan(numerator/z)
+
+        if(z < 0) {
+            theta += Math.PI
+        }
+    } else if(x !== 0 || y !== 0) {
+        theta = Math.PI/2.0
+    }
+
+    let phi = 0
+
+    if(x !== 0) {
+        phi = Math.atan(y/x)
+
+        if(x < 0) {
+            if(y >= 0) {
+                phi += Math.PI
+            } else {
+                phi += -Math.PI
+            }
+        }
+    } else if(y > 0) {
+        phi = Math.PI/2.0
+    } else if(y < 0) {
+        phi = -Math.PI/2.0
+    }
+
+    return [magnitude, theta, phi]
+}
+
+function rotateToSpherical(DOMElement, vector) {
+    const rotation = `rotateY(${vector[2]}rad) rotateX(${vector[1]}rad)`
+    //console.log(rotation)
+    DOMElement.style.transform += rotation
 }
 
 function get_vessel() {
@@ -269,7 +468,9 @@ function handle_scan(args) {
 
 // SUMMARY
 function handle_summary(args) {
-    return post_local("/game/" + get_system() + "/summary", "html=1");
+    let response = post_local("/game/" + get_system() + "/summary");
+    drawSummary(response)
+    return response
 }
 
 // AGENDA
