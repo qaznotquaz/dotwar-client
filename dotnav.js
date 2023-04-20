@@ -1,15 +1,21 @@
 const E = 1.6e7
+const A = 1.6e7
+const V = 1079251200
 const D = 1.12e7
 let EDGE = 10000000000
 let factor
 let lastScan
 let lastSummary
+let ward
 
 window.onload = function registerEventHandlersAndLoad() {
     let submit_btn = document.getElementById("submit_btn");
     submit_btn.addEventListener("click", handle_input);
 
-    document.addEventListener('wheel', function(e){
+    document.getElementById('test_button').addEventListener('click', patrolToWard)
+    document.getElementById('stop_vessel').addEventListener('click', stopMyShip)
+
+    document.addEventListener('wheel', function (e) {
         let zoomInc = E * 1000;
 
         if (e.ctrlKey) {
@@ -48,8 +54,12 @@ function drawScan(scan) {
     draw_line([0, 0, 0], [0, -EDGE, 0], 'green 1px dashed')
     draw_line([0, 0, 0], [0, 0, -EDGE], 'blue 1px dashed')
 
+    const entities = JSON.parse(scan)['entities']
+    entities.forEach(draw_vessel)
 
-    JSON.parse(scan)['entities'].forEach(draw_vessel)
+    ward = predictWardPosition(entities[5]['r'], entities[4]['r'], 1.5*E)
+    drawSphere(ward, D, 'transparent', 'gold 2px dotted')
+    draw_line(entities[5]['r'], entities[4]['r'], 'gold 2px dotted')
 
     lastScan = scan
 }
@@ -66,13 +76,13 @@ function drawSummary(summary) {
     let paths = {}
 
     JSON.parse(summary)['events'].forEach(function (item) {
-        if(item['type'] === 'burn') {
+        if (item['type'] === 'burn') {
             let vessel = item['args']['vessel']
             let pos = item['args']['position']
 
             console.log(vessel + ' at ' + pos)
 
-            if(!paths[vessel]) {
+            if (!paths[vessel]) {
                 paths[vessel] = []
             }
 
@@ -80,7 +90,7 @@ function drawSummary(summary) {
         }
     })
 
-    for(let [key, value] of Object.entries(paths)) {
+    for (let [key, value] of Object.entries(paths)) {
         drawPath(value)
     }
 
@@ -95,7 +105,7 @@ function redrawLastSummary() {
 
 function drawPath(nodes, style = 'white 1px solid') {
     nodes.forEach(function (item, index) {
-        if(index < nodes.length - 1) {
+        if (index < nodes.length - 1) {
             draw_line(item, nodes[index + 1], style)
         }
     })
@@ -104,21 +114,32 @@ function drawPath(nodes, style = 'white 1px solid') {
 function draw_vessel(vessel) {
     const origin = document.getElementById('origin');
     let craftDot = document.createElement('div')
-    origin.appendChild(craftDot);
-    let style;
+    let gimbal = document.createElement('div')
+
+    origin.appendChild(gimbal);
+    gimbal.appendChild(craftDot);
+
+    let projectionStyle = 'white 2px solid';
+    let sphereStyle1
+    let sphereStyle2
 
     craftDot.classList.add('dot')
+    gimbal.classList.add('dot')
     craftDot.classList.add(vessel['type'])
 
     let team
     switch (vessel['team']) {
         case 0:
             team = 'defender'
-            style = 'lightblue 2px double'
+            projectionStyle = 'lightblue 2px double'
+            sphereStyle1 = 'rgba(99, 127, 255, 0.3)'
+            sphereStyle2 = 'lightblue 2px solid'
             break
         case 1:
             team = 'attacker'
-            style = 'maroon 2px double'
+            projectionStyle = 'maroon 2px double'
+            sphereStyle1 = 'rgba(255, 99, 127, 0.3)'
+            sphereStyle2 = 'maroon 2px solid'
             break
         case -1:
         default:
@@ -147,15 +168,32 @@ function draw_vessel(vessel) {
     craftDot.appendChild(panelXZ);
 
     const coords = transformVectorToDrawingSpace(vessel['r'])
-    const spherical = cartesianToSpherical(vessel['a'])
 
-    panelYZ.style.borderColor = `rgba(255, 127, 0, ${spherical[0]/E})`
+    let spherical = cartesianToSpherical(transformVectorToDrawingSpace(vessel['a']))
+    panelYZ.style.borderColor = `rgba(255, 127, 0, ${spherical[0] / factor})`
 
-    craftDot.style.transform = `translate3d(${coords[0]}px, ${coords[1]}px, ${coords[2]}px)`
+    gimbal.style.transform = `translate3d(${coords[0]}px, ${coords[1]}px, ${coords[2]}px)`
+
+    if (vessel['a'][0] === 0 && vessel['a'][1] === 0 && vessel['a'][2] === 0) {
+        spherical = cartesianToSpherical(transformVectorToDrawingSpace(vessel['v']))
+    }
+
     rotateToSpherical(craftDot, spherical)
 
-    if(vessel['type'] === 'craft') {
-        drawProjection(vessel, 18, 2, style)
+    if (vessel['type'] === 'craft') {
+        drawProjection(vessel, 7, 2, projectionStyle)
+
+        drawProjectedDeviation(vessel['r'], vessel['v'], vessel['a'], 1, 11, 'transparent', sphereStyle2)
+        //drawTemperedDeviation(vessel['r'], vessel['v'], vessel['a'], 9, 3, sphereStyle1, sphereStyle2)
+        //drawConvergingDeviations(vessel['r'], vessel['v'], vessel['a'], 12, 1, 'transparent', sphereStyle2)
+
+        if (EDGE <= 1200000000) {
+            drawSphere(vessel['r'], D, sphereStyle1, sphereStyle2)
+        }
+    } else {
+        if (EDGE <= 1200000000) {
+            drawSphere(vessel['r'], E, 'rgba(99, 127, 255, 0.3)', 'darkgreen 6px solid')
+        }
     }
 }
 
@@ -172,7 +210,7 @@ function draw_line(vectorA, vectorB, style = 'white 1px solid') {
     const scaledA = transformVectorToDrawingSpace(vectorA)
     const scaledB = transformVectorToDrawingSpace(vectorB)
 
-    if(Math.sqrt((vectorA[0]*vectorA[0]) + (vectorA[1]*vectorA[1]) + (vectorA[2]*vectorA[2])) < E) {
+    if (Math.sqrt((vectorA[0] * vectorA[0]) + (vectorA[1] * vectorA[1]) + (vectorA[2] * vectorA[2])) < E) {
         console.log('POINT IN EARTH: ' + vectorA)
     }
 
@@ -196,7 +234,7 @@ function drawProjection(vessel, steps, stepSize, style = 'white 1px solid') {
     let time = 0.0
     let path = []
 
-    for(let i = 0; i < steps; i++) {
+    for (let i = 0; i < steps; i++) {
         path.push(pointAlongCurveAtTime(
             vessel['r'],
             vessel['v'],
@@ -212,10 +250,156 @@ function drawProjection(vessel, steps, stepSize, style = 'white 1px solid') {
 
 function pointAlongCurveAtTime(r, v, a, t) {
     return [
-        r[0] + (v[0]*t) + (a[0]*t*t*0.5),
-        r[1] + (v[1]*t) + (a[1]*t*t*0.5),
-        r[2] + (v[2]*t) + (a[2]*t*t*0.5)
+        r[0] + (v[0] * t) + (a[0] * t * t * 0.5),
+        r[1] + (v[1] * t) + (a[1] * t * t * 0.5),
+        r[2] + (v[2] * t) + (a[2] * t * t * 0.5)
     ]
+}
+
+function alertStop(vessel){
+    const reverse = getStopVector(vessel['v'])
+    const timeToStop = (magnitude(vessel['v'])/A)*3600
+    alert(`stop vessel ${vessel['name']} (current velocity ${vessel['v']}) by reversing at ${reverse} for ${timeToStop} seconds.`)
+}
+
+function getStopVector(v) {
+    return scaleVector(v, -A / magnitude(v))
+}
+
+function patrolToPoint(vessel, target) {
+    const startingPosition = vessel['r']
+    const difference = subVectors(target, startingPosition)
+    const distance = magnitude(difference)
+    const approachThrust = scaleVector(difference, A/distance)
+    const reverseThrust = getStopVector(approachThrust)
+    // assuming 0 starting velocity
+
+    // const midpoint = subVectors(((addVectors(target, startingPosition))/2), target)
+    const midDistance = distance/2
+    const timeToMid = Math.sqrt(2*A*midDistance)/A
+    const tripTime = timeToMid*2
+
+    if (confirm(`trip will take ${tripTime} hours, or ${tripTime*3600} seconds.`)) {
+        burnNow(approachThrust)
+        setTimeout(burnDelayed, 3000, reverseThrust, Math.floor(timeToMid*3600-3))
+        setTimeout(burnDelayed, 6000, [0, 0, 0], Math.floor(tripTime*3600-6))
+    } else {
+        alert('trip cancelled.')
+    }
+}
+
+function stopMyShip() {
+    scanNow()
+
+    stopVessel(JSON.parse(lastScan)['entities'][2])
+}
+
+function stopVessel(vessel) {
+    const reverseThrust = getStopVector(vessel['v'])
+    const timeToStop = magnitude(vessel['v'])/A
+
+    if (confirm(`stopping will take ${timeToStop} hours, or ${Math.floor(timeToStop*3600)} seconds.`)) {
+        setTimeout(burnNow, 3000, reverseThrust)
+        burnDelayed([0, 0, 0], Math.floor(timeToStop*3600) + 3)
+    } else {
+        alert('trip cancelled.')
+    }
+}
+
+function patrolToWard() {
+    scanNow()
+
+    patrolToPoint(JSON.parse(lastScan)['entities'][2], ward)
+}
+
+function velocityAtTime(v, a, t) {
+    return [
+        v[0] + a[0] * t,
+        v[1] + a[1] * t,
+        v[2] + a[2] * t
+    ]
+}
+
+function clipVelocity(v) {
+    const m = magnitude(v)
+    if (m <= V) {
+        return v
+    } else {
+        return scaleVector(v, (V / m))
+    }
+}
+
+function magnitude(vector) {
+    return Math.sqrt(vector[0] * vector[0] + vector[1] * vector[1] + vector[2] * vector[2])
+}
+
+function drawProjectedDeviation(r, v, a, steps, stepSize, bgStyle = 'transparent', borderStyle = 'white 1px solid') {
+    let time = stepSize
+
+    for (let i = 0; i < steps; i++) {
+        drawSphere(addVectors(r, scaleVector(v, time)), A * time * time * 0.5, bgStyle, borderStyle)
+        time += stepSize
+    }
+}
+
+function drawTemperedDeviation(r, v, a, staticPeriod, t, bgStyle = 'transparent', borderStyle = 'white 1px solid') {
+    const startingPoint = pointAlongCurveAtTime(r, v, a, staticPeriod)
+    const startingVelocity = clipVelocity(velocityAtTime(v, a, staticPeriod))
+    drawProjectedDeviation(startingPoint, startingVelocity, a, 1, t, bgStyle, borderStyle)
+}
+
+function drawConvergingDeviations(r, v, a, steps, stepSize, bgStyle = 'transparent', borderStyle = 'white 1px solid') {
+    let time = 0
+    let endPoint = stepSize * steps
+
+    for (let i = 0; i < steps; i++) {
+        drawTemperedDeviation(r, v, a, time, endPoint, bgStyle, borderStyle)
+        time += stepSize
+        endPoint -= stepSize
+    }
+}
+
+function drawSphere(centre, radius, backgroundColor = 'transparent', borderStyle = 'white 2px solid') {
+    const origin = document.getElementById('origin');
+    let gimbal = document.createElement('div')
+    let sphere = document.createElement('div')
+    const coords = transformVectorToDrawingSpace(centre)
+    const scaledRadius = radius * factor
+    origin.appendChild(gimbal);
+    gimbal.appendChild(sphere)
+
+    gimbal.classList.add('dot')
+    sphere.classList.add('sphere')
+    sphere.classList.add('dot')
+
+    const panelStyles = `
+        background-color: ${backgroundColor};
+        border: ${borderStyle};
+        width: ${scaledRadius * 2}px;
+        height: ${scaledRadius * 2}px;
+        
+        transform: translate3d(${scaledRadius}px, ${-scaledRadius}px, 0px)` // intentionally missing ;
+
+    let panelXY = document.createElement('div')
+    panelXY.classList.add('panel')
+    panelXY.classList.add('panelXY')
+    panelXY.style.cssText = panelStyles + ';'
+
+    let panelYZ = document.createElement('div')
+    panelYZ.classList.add('panel')
+    panelYZ.classList.add('panelYZ')
+    panelYZ.style.cssText = panelStyles + ' rotateX(90deg);'
+
+    let panelXZ = document.createElement('div')
+    panelXZ.classList.add('panel')
+    panelXZ.classList.add('panelXZ')
+    panelXZ.style.cssText = panelStyles + ' rotateY(90deg);'
+
+    sphere.appendChild(panelXY);
+    sphere.appendChild(panelYZ);
+    sphere.appendChild(panelXZ);
+
+    gimbal.style.transform = `translate3d(${coords[0]}px, ${coords[1]}px, ${coords[2]}px)`
 }
 
 function scaleVector(vector, scalar) {
@@ -224,6 +408,23 @@ function scaleVector(vector, scalar) {
         vector[1] * scalar,
         vector[2] * scalar
     ]
+}
+
+function predictWardPosition(ward, foe, radius) {
+    const normal = normalize(subVectors(foe, ward))
+    return addVectors(scaleVector(normal, radius), ward)
+}
+
+function dotProduct(a, b) {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+function vecFromScalar(s) {
+    return [s, s, s]
+}
+
+function normalize(v) {
+    return scaleVector(v, 1/magnitude(v))
 }
 
 function transformVectorToDrawingSpace(vector) {
@@ -260,40 +461,40 @@ function cartesianToSpherical(vector) {
     const z = vector[1] // "Y"
     const x = vector[2] // "Z"
 
-    const magnitude = Math.sqrt((x*x) + (y*y) + (z*z))
+    const m = magnitude([x, y, z])
 
     let theta = 0
 
-    if(z !== 0) {
-        const numerator = Math.sqrt((x*x) + (y*y))
-        theta = Math.atan(numerator/z)
+    if (z !== 0) {
+        const numerator = Math.sqrt((x * x) + (y * y))
+        theta = Math.atan(numerator / z)
 
-        if(z < 0) {
+        if (z < 0) {
             theta += Math.PI
         }
-    } else if(x !== 0 || y !== 0) {
-        theta = Math.PI/2.0
+    } else if (x !== 0 || y !== 0) {
+        theta = Math.PI / 2.0
     }
 
     let phi = 0
 
-    if(x !== 0) {
-        phi = Math.atan(y/x)
+    if (x !== 0) {
+        phi = Math.atan(y / x)
 
-        if(x < 0) {
-            if(y >= 0) {
+        if (x < 0) {
+            if (y >= 0) {
                 phi += Math.PI
             } else {
                 phi += -Math.PI
             }
         }
-    } else if(y > 0) {
-        phi = Math.PI/2.0
-    } else if(y < 0) {
-        phi = -Math.PI/2.0
+    } else if (y > 0) {
+        phi = Math.PI / 2.0
+    } else if (y < 0) {
+        phi = -Math.PI / 2.0
     }
 
-    return [magnitude, theta, phi]
+    return [m, theta, phi]
 }
 
 function rotateToSpherical(DOMElement, vector) {
@@ -352,6 +553,37 @@ function parse(str) {
         default:
             console.log("match fail");
     }
+}
+
+function burnTest() {
+    burnNow([1, 2, 3])
+}
+
+function scanNow() {
+    let response = post_local("/game/" + get_system() + "/scan");
+    console.log("response is " + response);
+    drawScan(response)
+    return response;
+}
+
+function burnNow(acceleration) {
+    burnDelayed(acceleration, 0)
+}
+
+function burnDelayed(acceleration, delay) {
+    let order = {
+        'task': 'burn',
+        'interval': 10,
+        'args': {
+            'a': acceleration
+        },
+        'time': delay
+    }
+    order = JSON.stringify(order);
+    console.log("in burn handler, args " + order);
+    let response = post_local("/game/TESTGAME/add_order", "&authcode=" + get_authcode() + "&vessel=" + get_vessel() + "&order=" + order);
+    console.log("response is " + response);
+    return response;
 }
 
 function handle(args) {
@@ -445,7 +677,7 @@ function handle_burn(args) {
     args.time = args.time_input;
     args = JSON.stringify(args);
     console.log("in burn handler, args " + args);
-    let response = post_local("/game/" + get_system() + "/add_order", "html=1&authcode=" + get_authcode() + "&vessel=" + get_vessel() + "&order=" + args);
+    let response = post_local("/game/" + get_system() + "/add_order", "&authcode=" + get_authcode() + "&vessel=" + get_vessel() + "&order=" + args);
     console.log("response is " + response);
     return response;
 }

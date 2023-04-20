@@ -1,7 +1,7 @@
 :root {
     --E: 100px;
     --D: 70px;
-    --Planet: 25px;
+    --Planet: 30px;
     --Craft: 10px;
     background-color: black;
 }
@@ -24,6 +24,11 @@
     30% {transform: rotateY(90deg) rotateX(0deg)   rotateZ(0deg)}
     60% {transform: rotateY(90deg) rotateX(360deg) rotateZ(0deg)}
     90% {transform: rotateY(90deg) rotateX(360deg) rotateZ(360deg)}
+}
+
+@keyframes twistInSpace {
+    from {transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg) }
+    to {transform:   rotateX(360deg) rotateY(360deg) rotateZ(360deg) }
 }
 
 #origin {
@@ -75,14 +80,14 @@
 
 .craft > .panelXY {
     transform: translate3d(var(--Craft), calc(-1*var(--Craft)), 0);
-    border-top: none;
-    border-bottom: calc(var(--Craft)*2) solid;
+    border-top: calc(var(--Craft)*2) solid;
+    border-bottom: none;
     border-left: var(--Craft) solid transparent;
     border-right: var(--Craft) solid transparent;
 }
 
 .craft > .panelYZ {
-    transform: translate3d(var(--Craft), calc(0.125*var(--Craft)), 0) rotateX(90deg);
+    transform: translate3d(var(--Craft), calc(-2.125*var(--Craft)), 0) rotateX(90deg);
     width: calc(var(--Craft) * 2);
     height: calc(var(--Craft) * 2);
     border-radius: 50%;
@@ -93,27 +98,48 @@
 
 .craft > .panelXZ {
     transform: translate3d(var(--Craft), calc(-1*var(--Craft)), 0) rotateY(90deg);
-    border-top: none;
-    border-bottom: calc(var(--Craft)*2) solid;
+    border-top: calc(var(--Craft)*2) solid;
+    border-bottom: none;
     border-left: var(--Craft) solid transparent;
     border-right: var(--Craft) solid transparent;
 }
 
+.sphere {
+    width: 0;
+    height: 0;
+
+    animation-name: twistInSpace;
+    animation-duration: 10s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+}
+
+.sphere > .panel {
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.sphere > .panelXY {}
+
+.sphere > .panelYZ {}
+
+.sphere > .panelXZ {}
+
 
 .defender > .panelXY {
-    border-bottom-color: steelblue;
+    border-top-color: steelblue;
 }
 
 .defender > .panelXZ {
-    border-bottom-color: steelblue;
+    border-top-color: steelblue;
 }
 
 .attacker > .panelXY {
-    border-bottom-color: red;
+    border-top-color: red;
 }
 
 .attacker > .panelXZ {
-    border-bottom-color: red;
+    border-top-color: red;
 }
 
 .planet[data-name="Earth"] > .panel {
